@@ -1,0 +1,104 @@
+C51 COMPILER V9.52.0.0   MAIN                                                              08/07/2019 16:11:33 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Output\main.obj
+COMPILER INVOKED BY: F:\Program Files (x86)\KEIL_C51\C51\BIN\C51.EXE Code\main.c LARGE BROWSE NOINTPROMOTE INCDIR(.\Code
+                    -;.\Code\MyPt;.\Code\MyPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\main.lst) OBJECT(.\Output\main.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2            * @file       : main
+   3            * @brief      : 
+   4            * @note       :
+   5                              flash:  18KB
+   6                              data:   127KB
+   7                              idata:  127KB
+   8                              xdata:  766KB
+   9          
+  10            * @version    : V1.0
+  11            * @date       : 2018-1-1
+  12          *******************************************************************************/
+  13          
+  14          #include "m_include.h"
+  15          
+  16          
+  17          /*******************************************************************************
+  18            * @name       : main
+  19            * @brief      : null
+  20            * @note       : null
+  21            * @param      : null
+  22            * @retval     : null
+  23            * @date       : 2018-1-16
+  24          *******************************************************************************/
+  25          void main( void )
+  26          {
+  27   1      
+  28   1          HAL_Init();
+  29   1          read_mcu_96bit_uuid( Control.MCU_96bit_UUID );
+  30   1          SysTickInit();
+  31   1      
+  32   1          TaskInit();
+  33   1          TaskRun();
+  34   1      
+  35   1          while( 1 )
+  36   1          {
+  37   2              ;
+  38   2          }
+  39   1      
+  40   1      }
+  41          
+  42          
+  43          
+  44          void Timer2_ISR( void ) interrupt 5
+  45          {
+  46   1          TF2 = 0;//Clear Timer2 Interrupt Flag
+  47   1          gU32Systick++;
+  48   1      }
+  49          
+  50          void Uart0_ISR( void ) interrupt 4
+  51          {
+  52   1          UART0_Rx_Isr();
+  53   1          if( TI )
+  54   1          {
+C51 COMPILER V9.52.0.0   MAIN                                                              08/07/2019 16:11:33 PAGE 2   
+
+  55   2              TI = 0;
+  56   2              UART_0.TI_FLAG = 1;
+  57   2          }
+  58   1      }
+  59          
+  60          void PinInterrupt_ISR ( void ) interrupt 7
+  61          {
+  62   1          PIF = 0x00;
+  63   1          clr_EPI;
+  64   1          
+  65   1      }
+  66          
+  67          void INT0_ISR ( void ) interrupt 0
+  68          {
+  69   1          Control.Key_WakeUp = 1;
+  70   1          clr_EX0;
+  71   1      }
+  72          
+  73          void INT1_ISR ( void ) interrupt 2
+  74          {
+  75   1          Control.Key_WakeUp = 1;
+  76   1          clr_EX1;
+  77   1      }
+  78          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    213    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,611 @@
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE AT24C02
+OBJECT MODULE PLACED IN .\Output\at24c02.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Code\at24c02.c LARGE BROWSE NOINTPROMOTE INCDIR(.\Code;.\Code\MyPt;.\Code\M
+                    -yPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\at24c02.lst) OBJECT(.\Output\at24c02.obj)
+
+line level    source
+
+   1          /*****************************************************************************
+   2            * @file       : at24c02
+   3            * @brief      : 低位存放高字节
+   4            * @note       : null
+   5            * @version    : V1.0
+   6            * @date       : 2017-7-25
+   7          ******************************************************************************/
+   8          
+   9          /*
+  10          EEPROM
+  11          
+  12          0.factory_flag--0xAA
+  13          1.sw_memory_flag-- bits  0=off 1=on   bit0~bit7==sw1~sw8
+  14          2.sw1_cmd-- 0=off 1=on
+  15          3.sw2_cmd-- 0=off 1=on
+  16          4.sw3_cmd-- 0=off 1=on
+  17          5.sw4_cmd-- 0=off 1=on
+  18          6.sw5_cmd-- 0=off 1=on
+  19          7.sw6_cmd-- 0=off 1=on
+  20          8.sw7_cmd-- 0=off 1=on
+  21          9.sw8_cmd-- 0=off 1=on
+  22          
+  23          14.time_limit Hight8Byte
+  24          15.time_limit Low8Byte
+  25          
+  26          
+  27          */
+  28          
+  29          
+  30          
+  31          //.C
+  32          /*============包含标准库头文件================================================*/
+  33          
+  34          /*============包含非标准库头文件==============================================*/
+  35          #include "m_include.h"
+  36          #include "at24c02.h"
+  37          #include "test.h"
+  38          /*============文件内部 常量定义 const ========================================*/
+  39          
+  40          /*============文件内部 宏定义 define =========================================*/
+  41          //IO定义
+  42          #define SDA_R()         P14//P14
+  43          
+  44          #define SDA_H           P14=1;//P14
+  45          #define SDA_L           P14=0;
+  46          
+  47          #define SCL_H           P13=1;//P13
+  48          #define SCL_L           P13=0;
+  49          
+  50          #define IIC_Add         0xA0    //器件地址
+  51          /*============文件内部 数据类型定义 typedef ==================================*/
+  52          
+  53          /*============文件内部 局部变量定义 static ===================================*/
+  54          
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 2   
+
+  55          /*============文件内部 全局变量定 ============================================*/
+  56          xdata AT24C02_Struct at24c02;
+  57          /*============文件内部 函数原型定义 static ===================================*/
+  58          
+  59          /*****************************************************************************
+  60            * @name       : null
+  61            * @brief      : null
+  62            * @note       : null
+  63            * @param      : null
+  64            * @retval     : null
+  65            * @date       : 2017-7-26
+  66          ******************************************************************************/
+  67          
+  68          static void delay10us(void);
+  69          static void I2C_Start(void);
+  70          static void I2C_Stop(void);
+  71          static void Ack(void);
+  72          static void NoAck(void);
+  73          static uint8_t Test_Ack(void);
+  74          static void SendData(uint8_t buffer);
+  75          static uint8_t ReceiveData(void);
+  76          
+  77          
+  78          static void delay10us(void)
+  79          {
+  80   1          uint8_t i;
+  81   1      
+  82   1          i = 40;
+  83   1      
+  84   1          while(i)
+  85   1          {
+  86   2              _nop_();
+  87   2              _nop_();
+  88   2              _nop_();
+  89   2              _nop_();
+  90   2              i--;
+  91   2          }
+  92   1      
+  93   1      }
+  94          
+  95          //**********************************************
+  96          //送起始位 sda=1->0
+  97          static void I2C_Start(void)
+  98          {
+  99   1          SDA_H;
+ 100   1          SCL_H;
+ 101   1          delay10us();
+ 102   1          SDA_L;
+ 103   1          delay10us();
+ 104   1          SCL_L;
+ 105   1      }
+ 106          
+ 107          //************************************************
+ 108          //送停止位 sda=0->1
+ 109          static void I2C_Stop(void)
+ 110          {
+ 111   1          SDA_L;
+ 112   1          delay10us();
+ 113   1          SCL_H;
+ 114   1          delay10us();
+ 115   1          SDA_H;
+ 116   1      }
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 3   
+
+ 117          
+ 118          //************************************************
+ 119          //主应答
+ 120          static void Ack(void)
+ 121          {
+ 122   1          /*
+ 123   1          //设置SDA 口为输出
+ 124   1          SDA_L;
+ 125   1          SCL_L;
+ 126   1          delay10us();
+ 127   1          SCL_H;
+ 128   1          delay10us();
+ 129   1          SCL_L;
+ 130   1          SDA_H;
+ 131   1          */
+ 132   1      
+ 133   1          SDA_L;
+ 134   1          delay10us();
+ 135   1          SCL_H;
+ 136   1          delay10us();
+ 137   1          SCL_L;
+ 138   1      
+ 139   1      
+ 140   1      }
+ 141          
+ 142          //************************************************
+ 143          //主不应答
+ 144          static void NoAck(void)
+ 145          {
+ 146   1          /*
+ 147   1          //设置SDA 口为输出
+ 148   1          SDA_H;
+ 149   1          SCL_L;
+ 150   1          delay10us();
+ 151   1          SCL_H;
+ 152   1          delay10us();
+ 153   1          SDA_H;
+ 154   1          SCL_L;
+ 155   1          */
+ 156   1      
+ 157   1          SDA_H;
+ 158   1          delay10us();
+ 159   1          SCL_H;
+ 160   1          delay10us();
+ 161   1          SCL_L;
+ 162   1          delay10us();
+ 163   1      
+ 164   1      
+ 165   1      }
+ 166          
+ 167          // 检测 SDA是否回ACK
+ 168          static uint8_t Test_Ack(void)
+ 169          {
+ 170   1          //设置SDA 口为输入
+ 171   1          uint8_t ACK_Flag = 0;
+ 172   1      
+ 173   1          SCL_L;
+ 174   1          SDA_H;
+ 175   1          delay10us();
+ 176   1          SCL_H;
+ 177   1          delay10us();
+ 178   1      
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 4   
+
+ 179   1          /*
+ 180   1          if(SDA_R()==0)
+ 181   1              ACK_Flag = 1;
+ 182   1          else
+ 183   1              ACK_Flag = 0;
+ 184   1          */
+ 185   1      
+ 186   1          SCL_L;
+ 187   1      
+ 188   1          ACK_Flag = 1;//忽略应答
+ 189   1      
+ 190   1          return ACK_Flag;
+ 191   1      }
+ 192          
+ 193          //*************************************************
+ 194          //字节发送程序
+ 195          //发送(可以是数据也可是地址)，送完后接收从应答
+ 196          //不考虑从应答位
+ 197          static void SendData(uint8_t buffer)
+ 198          {
+ 199   1          uint8_t BitCnt = 8; //一字节8位
+ 200   1      
+ 201   1          //设置SDA 口为输出
+ 202   1          do
+ 203   1          {
+ 204   2              SCL_L;
+ 205   2              delay10us();
+ 206   2      
+ 207   2              if((buffer & 0x80) == 0)     //判断最高位是0还是1
+ 208   2              {
+ 209   3                  SDA_L;
+ 210   3              }
+ 211   2              else
+ 212   2              {
+ 213   3                  SDA_H;
+ 214   3              }
+ 215   2      
+ 216   2              SCL_H;
+ 217   2              delay10us();
+ 218   2              buffer = buffer << 1; //将buffer中的数据左移一位
+ 219   2              BitCnt--;
+ 220   2          }
+ 221   1          while(BitCnt);
+ 222   1      
+ 223   1          SCL_L;
+ 224   1      }
+ 225          
+ 226          //**************************************************
+ 227          //字节接收程序
+ 228          //接收器件传来的数据，此程序应配合应答函数使用
+ 229          static uint8_t ReceiveData(void)
+ 230          {
+ 231   1          uint8_t BitCnt = 8, IIC_RX_Data = 0;
+ 232   1      
+ 233   1          SDA_H;//读入数据 设置SDA 口为输入
+ 234   1      
+ 235   1          do
+ 236   1          {
+ 237   2              SCL_L;
+ 238   2              delay10us();
+ 239   2              IIC_RX_Data <<= 1; //数据左移一位
+ 240   2              BitCnt--;
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 5   
+
+ 241   2              SCL_H;
+ 242   2              delay10us();
+ 243   2      
+ 244   2              if(SDA_R() == 1)
+ 245   2                  IIC_RX_Data = IIC_RX_Data | 0x01; //低位置1
+ 246   2              else
+ 247   2                  IIC_RX_Data = IIC_RX_Data & 0x0fe; //低位清0
+ 248   2          }
+ 249   1          while(BitCnt);
+ 250   1      
+ 251   1          SCL_L;
+ 252   1          return IIC_RX_Data;
+ 253   1      }
+ 254          
+ 255          
+ 256          
+ 257          /*****************************************************************************
+ 258            * @name       : at24c02_write_byte_reg
+ 259            * @brief      : 向指定寄存器写入一个字节
+ 260            * @note       : null
+ 261            * @param      : null
+ 262            * @retval     : null
+ 263            * @date       : 2017-7-26
+ 264          ******************************************************************************/
+ 265          uint8_t at24c02_write_byte_reg(uint8_t reg, uint8_t wdata)
+ 266          {
+ 267   1      
+ 268   1          I2C_Start();  //启动I2C
+ 269   1          SendData(IIC_Add);   //发送器件地址
+ 270   1      
+ 271   1          if(!Test_Ack())
+ 272   1          {
+ 273   2      
+ 274   2              return(0);
+ 275   2          }
+ 276   1      
+ 277   1          SendData(reg);   //写入寄存器地址
+ 278   1      
+ 279   1          if(!Test_Ack())
+ 280   1          {
+ 281   2      
+ 282   2              return(0);
+ 283   2          }
+ 284   1      
+ 285   1          SendData(wdata);   //写入数据
+ 286   1      
+ 287   1          if(!Test_Ack())
+ 288   1          {
+ 289   2      
+ 290   2              return(0);
+ 291   2          }
+ 292   1      
+ 293   1          I2C_Stop();
+ 294   1      
+ 295   1          return(1);
+ 296   1      
+ 297   1      
+ 298   1      }
+ 299          
+ 300          
+ 301          /*****************************************************************************
+ 302            * @name       : at24c02_read_byte_reg
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 6   
+
+ 303            * @brief      : 连续读
+ 304            * @note       : null
+ 305            * @param      : reg:寄存器地址 *buf：保存数据的数组指针  length：长度
+ 306            * @retval     : null
+ 307            * @date       : 2017-7-26
+ 308          ******************************************************************************/
+ 309          uint8_t at24c02_read_byte_reg(uint8_t reg, uint8_t* buf, uint8_t length)
+ 310          {
+ 311   1          uint8_t i;
+ 312   1      
+ 313   1          I2C_Start();  //启动I2C
+ 314   1          SendData(IIC_Add);   //发送器件地址
+ 315   1      
+ 316   1          if(!Test_Ack())
+ 317   1          {
+ 318   2      
+ 319   2              return(0);
+ 320   2          }
+ 321   1      
+ 322   1          SendData(reg);   //写入寄存器地址
+ 323   1      
+ 324   1          if(!Test_Ack())
+ 325   1          {
+ 326   2      
+ 327   2              return(0);
+ 328   2          }
+ 329   1      
+ 330   1          delay10us();
+ 331   1          delay10us();
+ 332   1          delay10us();
+ 333   1      
+ 334   1          I2C_Start();// 启动I2C
+ 335   1          SendData((IIC_Add) | 0x01);     //发送器件地址
+ 336   1      
+ 337   1          if(!Test_Ack())
+ 338   1          {
+ 339   2      
+ 340   2              return(0);
+ 341   2          }
+ 342   1      
+ 343   1          for(i = 0; i < length - 1; i++)   //读取字节数据
+ 344   1          {
+ 345   2              *(buf + i) = ReceiveData();   //读取数据
+ 346   2              Ack();
+ 347   2          }
+ 348   1      
+ 349   1          *(buf + length - 1) = ReceiveData();
+ 350   1          NoAck();
+ 351   1          I2C_Stop();
+ 352   1      
+ 353   1          return(1);
+ 354   1      
+ 355   1      }
+ 356          
+ 357          
+ 358          /*****************************************************************************
+ 359            * @name       : at24c02_write_flow
+ 360            * @brief      : 将 write_data数组以一定间隔写到EEP  10ms
+ 361            * @note       : null
+ 362            * @param      : null
+ 363            * @retval     : null
+ 364            * @date       : 2017-7-26
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 7   
+
+ 365          ******************************************************************************/
+ 366          void at24c02_write_flow(void)
+ 367          {
+ 368   1      
+ 369   1          if(at24c02.update)   //更新
+ 370   1          {
+ 371   2      
+ 372   2              at24c02_write_byte_reg(at24c02.step, at24c02.write_data[at24c02.step]);
+ 373   2              at24c02.step++;
+ 374   2      
+ 375   2              if(at24c02.step >= BUFF_SIZE)   //耗时N*10ms
+ 376   2              {
+ 377   3                  //结束
+ 378   3                  at24c02.step = 0;
+ 379   3                  at24c02.update = 0;
+ 380   3      
+ 381   3              }
+ 382   2      
+ 383   2          }
+ 384   1      
+ 385   1      }
+ 386          
+ 387          
+ 388          /*****************************************************************************
+ 389            * @name       : at24c02_update_data
+ 390            * @brief      : 将实际数据更新到write_data数组 在需要的地方调用
+ 391            * @note       : null
+ 392            * @param      : reset:1：将首次上电标志清零，设置成第一次出厂
+ 393            * @retval     : null
+ 394            * @date       : 2017-7-26
+ 395          ******************************************************************************/
+ 396          void at24c02_update_data(uint8_t reset)
+ 397          {
+ 398   1          uint8_t i;
+ 399   1      
+ 400   1      
+ 401   1          // if(at24c02.update!=1)
+ 402   1          {
+ 403   2      
+ 404   2              at24c02.update = 1;
+ 405   2              at24c02.step = 0;
+ 406   2      
+ 407   2              memset(at24c02.write_data, 0, BUFF_SIZE);
+ 408   2      
+ 409   2              if(reset)
+ 410   2              {
+ 411   3      
+ 412   3              }
+ 413   2              else
+ 414   2              {
+ 415   3                  at24c02.write_data[0] = 0xAA;
+ 416   3                  at24c02.write_data[1] = control.sw_memory_flag;
+ 417   3      
+ 418   3                  for(i = 0; i < 8; i++)
+ 419   3                  {
+ 420   4      
+ 421   4                      if(control.sw_memory_flag & (1 << i))
+ 422   4                      {
+ 423   5                          at24c02.write_data[i + 2] = control.sw_cmd[i];
+ 424   5                      }
+ 425   4      
+ 426   4                  }
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 8   
+
+ 427   3      
+ 428   3      
+ 429   3              }
+ 430   2      
+ 431   2      
+ 432   2          }
+ 433   1      
+ 434   1      }
+ 435          
+ 436          
+ 437          /*****************************************************************************
+ 438            * @name       : at24c02_read_all
+ 439            * @brief      : 开机读取全部数据 at24c02_init调用
+ 440            * @note       : null
+ 441            * @param      : null
+ 442            * @retval     : null
+ 443            * @date       : 2017-7-26
+ 444          ******************************************************************************/
+ 445          static void at24c02_read_all(void)
+ 446          {
+ 447   1      
+ 448   1          at24c02_read_byte_reg(0x00, at24c02.read_data, BUFF_SIZE);
+ 449   1      
+ 450   1      
+ 451   1          if(at24c02.read_data[0] == 0xAA)
+ 452   1          {
+ 453   2              //非首次上电
+ 454   2              control.sw_memory_flag = at24c02.read_data[1];
+ 455   2      
+ 456   2              control.sw_cmd[SW1] = at24c02.read_data[2];
+ 457   2              control.sw_cmd[SW2] = at24c02.read_data[3];
+ 458   2              control.sw_cmd[SW3] = at24c02.read_data[4];
+ 459   2              control.sw_cmd[SW4] = at24c02.read_data[5];
+ 460   2              control.sw_cmd[SW5] = at24c02.read_data[6];
+ 461   2              control.sw_cmd[SW6] = at24c02.read_data[7];
+ 462   2              control.sw_cmd[SW7] = at24c02.read_data[8];
+ 463   2              control.sw_cmd[SW8] = at24c02.read_data[9];
+ 464   2      
+ 465   2          }
+ 466   1          else
+ 467   1          {
+ 468   2              //首次上电
+ 469   2              control.sw_memory_flag = 0xFF;
+ 470   2      
+ 471   2              control.sw_cmd[SW1] = 0x00;
+ 472   2              control.sw_cmd[SW2] = 0x00;
+ 473   2              control.sw_cmd[SW3] = 0x00;
+ 474   2              control.sw_cmd[SW4] = 0x00;
+ 475   2              control.sw_cmd[SW5] = 0x00;
+ 476   2              control.sw_cmd[SW6] = 0x00;
+ 477   2              control.sw_cmd[SW7] = 0x00;
+ 478   2              control.sw_cmd[SW8] = 0x00;
+ 479   2      
+ 480   2              at24c02_update_data(0);
+ 481   2      
+ 482   2          }
+ 483   1      
+ 484   1      
+ 485   1      }
+ 486          
+ 487          
+ 488          /*****************************************************************************
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 9   
+
+ 489            * @name       : at24c02_factory_reset
+ 490            * @brief      : 将出厂数据更新到write_data数组
+ 491            * @note       : null
+ 492            * @param      : null
+ 493            * @retval     : null
+ 494            * @date       : 2017-7-26
+ 495          ******************************************************************************/
+ 496          void at24c02_factory_reset(void)
+ 497          {
+ 498   1          /*
+ 499   1      
+ 500   1          TDS1.Value = 999;
+ 501   1          TDS2.Value = 0;
+ 502   1      
+ 503   1          filter.ro_life_work_time_min = 0;
+ 504   1          filter.ro_life_poweron_time_min = 0;
+ 505   1          filter.ro_life_percent = 100;
+ 506   1      
+ 507   1          filter.c_life_work_time_min = 0;
+ 508   1          filter.c_life_poweron_time_min = 0;
+ 509   1          filter.c_life_percent = 100;
+ 510   1      
+ 511   1          filter.uf_life_work_time_min = 0;
+ 512   1          filter.uf_life_poweron_time_min = 0;
+ 513   1          filter.uf_life_percent = 100;
+ 514   1      
+ 515   1          bt_sensor_in.toc = 0;
+ 516   1          bt_sensor_in.cod = 0;
+ 517   1          bt_sensor_in.uv254 = 0;
+ 518   1      
+ 519   1          bt_sensor_out.toc = 0;
+ 520   1          bt_sensor_out.cod = 0;
+ 521   1          bt_sensor_out.uv254 = 0;
+ 522   1      
+ 523   1          control.total_water_flow = 0;
+ 524   1          control.total_water_flow_wifi = 0;
+ 525   1      
+ 526   1          filter.ro_filter_end = 0;
+ 527   1          filter.c_filter_end = 0;
+ 528   1          filter.uf_filter_end = 0;
+ 529   1      
+ 530   1          at24c02_update_data( 1 );
+ 531   1      
+ 532   1          */
+ 533   1      
+ 534   1      }
+ 535          
+ 536          
+ 537          
+ 538          
+ 539          /*****************************************************************************
+ 540            * @name       : at24c02_init
+ 541            * @brief      : null
+ 542            * @note       : null
+ 543            * @param      : null
+ 544            * @retval     : null
+ 545            * @date       : 2017-7-26
+ 546          ******************************************************************************/
+ 547          void at24c02_init(void)
+ 548          {
+ 549   1      
+ 550   1          //开漏输出
+C51 COMPILER V9.52.0.0   AT24C02                                                           07/30/2019 15:24:58 PAGE 10  
+
+ 551   1          //上电时保证两总线为高
+ 552   1      
+ 553   1          //SCL
+ 554   1          P1M1 |= SET_BIT3;
+ 555   1          P1M2 |= SET_BIT3;
+ 556   1          //SDA
+ 557   1          P1M1 |= SET_BIT4;
+ 558   1          P1M2 |= SET_BIT4;
+ 559   1      
+ 560   1          SCL_H;
+ 561   1          SDA_H;
+ 562   1      
+ 563   1          at24c02_read_all();
+ 564   1      }
+ 565          
+ 566          
+ 567          
+ 568          
+ 569          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    585    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     26       6
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

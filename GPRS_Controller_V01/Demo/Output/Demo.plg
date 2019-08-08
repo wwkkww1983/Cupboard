@@ -1,0 +1,14 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+D:\04MyFile\2G¹ñËø\´úÂë\GPRS_Controller_V01_2019-8-3\Demo\GPIO.uvproj
+Project File Date:  08/06/2019
+
+<h2>Output:</h2>
+Build target 'Demo'
+linking...
+Program Size: data=61.1 xdata=358 code=7851
+creating hex file from ".\Output\Demo"...
+".\Output\Demo" - 0 Error(s), 0 Warning(s).

@@ -1,0 +1,226 @@
+C51 COMPILER V9.52.0.0   THREAD                                                            08/07/2019 16:00:36 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE THREAD
+OBJECT MODULE PLACED IN .\Output\thread.obj
+COMPILER INVOKED BY: F:\Program Files (x86)\KEIL_C51\C51\BIN\C51.EXE Code\MyPt\thread.c LARGE BROWSE NOINTPROMOTE INCDIR
+                    -(.\Code;.\Code\MyPt;.\Code\MyPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\thread.lst) OBJECT(.\Output\t
+                    -hread.obj)
+
+line level    source
+
+   1          #include "thread.h"
+   2          #include "m_include.h"
+   3          /*---------------------------------------------------------------------------*/
+   4          static  pt_thread gTask[MAX_THREADS + 1u] ;//
+   5          ptThreadInfo threadInfo = {THREAD_WAITING, 0, 0, 0, MAX_THREADS};
+   6          /*---------------------------------------------------------------------------*/
+   7          void TaskRun(void)
+   8          {
+   9   1              while(true)
+  10   1          {
+  11   2              static  pt_thread* p;
+  12   2              threadInfo.Index = 0;
+  13   2              for(p = gTask; p->func ; p++, threadInfo.Index++)
+  14   2              {
+  15   3                  if(p->status < THREAD_EXITED)
+  16   3                  {
+  17   4                      p->status = p->func(&p->pt);
+  18   4                      RstWatchDog();
+  19   4                  }
+  20   3              }
+  21   2          }
+  22   1      }
+  23          /*---------------------------------------------------------------------------*/
+  24          /** \brief
+  25           *
+  26           * \param
+  27           * \param
+  28           * \return
+  29           *
+  30           */
+  31          BOOL timer_expired(timer_t* t)
+  32          {
+  33   1           u32 clock ;
+  34   1          DI();
+  35   1          clock = gU32Systick;
+  36   1          EI();
+  37   1          clock -= t->start;
+  38   1      
+  39   1          if(clock >= t->interval)
+  40   1          {
+  41   2              return true;
+  42   2          }
+  43   1      
+  44   1          return false;
+  45   1      }
+  46          /*---------------------------------------------------------------------------*/
+  47          /** \brief
+  48           *
+  49           * \param
+  50           * \param
+  51           * \return
+  52           *
+  53           */
+C51 COMPILER V9.52.0.0   THREAD                                                            08/07/2019 16:00:36 PAGE 2   
+
+  54          
+  55          void timer_set(timer_t* t, u32 interval)
+  56          {
+  57   1          t->interval = interval;
+  58   1          DI();
+  59   1          t->start = gU32Systick;
+  60   1          EI();
+  61   1      }
+  62          /*---------------------------------------------------------------------------*/
+  63          /** \brief
+  64           *
+  65           * \param
+  66           * \param
+  67           * \return
+  68           *
+  69           */
+  70          
+  71          void Thread_Start(pFUNC func, ThreadStatus* status)
+  72          {
+  73   1           u8 threadIndex = 0 ;
+  74   1      
+  75   1      // First find a gap in the array (if there is one)
+  76   1          while((gTask[threadIndex].func != NULL) && (gTask[threadIndex].func != func) && (threadIndex < MAX_THR
+             -EADS))
+  77   1          {
+  78   2              threadIndex++;
+  79   2          }
+  80   1      
+  81   1          if(gTask[threadIndex].func == func)
+  82   1          {
+  83   2              gTask[threadIndex].pt.lc = 0;
+  84   2              gTask[threadIndex].status = THREAD_WAITING;
+  85   2              gTask[threadIndex].suspended = false;
+  86   2              *status = THREAD_OK;
+  87   2              return ;
+  88   2          }
+  89   1      
+  90   1          if(threadIndex == MAX_THREADS)
+  91   1          {
+  92   2              *status = THREAD_ERR;
+  93   2              return ;
+  94   2          }
+  95   1      
+  96   1      // If we're here, there is a space in the task array
+  97   1          gTask[threadIndex].func = func;
+  98   1          gTask[threadIndex].pt.lc = 0;
+  99   1          gTask[threadIndex].status = THREAD_WAITING;
+ 100   1          gTask[threadIndex].suspended = false;
+ 101   1          threadInfo.MaxThreadIndex = threadIndex;          // return position of task (to allow later deletion)
+ 102   1          threadInfo.SizeofTaskBytes = sizeof(gTask);
+ 103   1          threadInfo.SizeofThreadBytes = sizeof(pt_thread);
+ 104   1          threadInfo.MaxThread = ARR_SIZE(gTask) - 1;
+ 105   1          *status = THREAD_OK;
+ 106   1      }
+ 107          /*---------------------------------------------------------------------------*/
+ 108          /** \brief
+ 109           *
+ 110           * \param
+ 111           * \param
+ 112           * \return
+ 113           *
+ 114           */
+C51 COMPILER V9.52.0.0   THREAD                                                            08/07/2019 16:00:36 PAGE 3   
+
+ 115          ThreadStatus getThreadStatus(pFUNC func)
+ 116          {
+ 117   1           u8 threadIndex = 0;
+ 118   1      
+ 119   1          while((gTask[threadIndex].func != NULL)  && (gTask[threadIndex].func != func) && (threadIndex < MAX_TH
+             -READS))
+ 120   1          {
+ 121   2              threadIndex++;
+ 122   2          }
+ 123   1      
+ 124   1          if(gTask[threadIndex].func == func)
+ 125   1          {
+ 126   2              return gTask[threadIndex].status;
+ 127   2          }
+ 128   1      
+ 129   1          return THREAD_ERR;
+ 130   1      }
+ 131          /*---------------------------------------------------------------------------*/
+ 132          /** \brief
+ 133           *
+ 134           * \param
+ 135           * \param
+ 136           * \return
+ 137           *
+ 138           */
+ 139          void Thread_Suspend(pFUNC  func, ThreadStatus* status)
+ 140          {
+ 141   1           u8 threadIndex = 0;
+ 142   1      
+ 143   1          while((gTask[threadIndex].func != NULL) && (gTask[threadIndex].func != func) && (threadIndex < MAX_THR
+             -EADS))
+ 144   1          {
+ 145   2              threadIndex++;
+ 146   2          }
+ 147   1      
+ 148   1          if(gTask[threadIndex].func == func)
+ 149   1          {
+ 150   2              if(gTask[threadIndex].status != THREAD_SUSPENDED && gTask[threadIndex].suspended == false)
+ 151   2              {
+ 152   3                  gTask[threadIndex].status = THREAD_SUSPENDED;
+ 153   3                  gTask[threadIndex].suspended = threadInfo.Index;
+ 154   3                  *status = THREAD_OK;
+ 155   3                  return;
+ 156   3              }
+ 157   2          }
+ 158   1      
+ 159   1          *status = THREAD_ERR;
+ 160   1      }
+ 161          /*---------------------------------------------------------------------------*/
+ 162          /** \brief
+ 163           *
+ 164           * \param
+ 165           * \param
+ 166           * \return
+ 167           *
+ 168           */
+ 169          void Thread_Resume(pFUNC func, ThreadStatus* status)
+ 170          {
+ 171   1           u8 threadIndex = 0;
+ 172   1      
+ 173   1          while((gTask[threadIndex].func != NULL) && (gTask[threadIndex].func != func) && (threadIndex < MAX_THR
+             -EADS))
+C51 COMPILER V9.52.0.0   THREAD                                                            08/07/2019 16:00:36 PAGE 4   
+
+ 174   1          {
+ 175   2              threadIndex++;
+ 176   2          }
+ 177   1      
+ 178   1          if(gTask[threadIndex].func == func)
+ 179   1          {
+ 180   2              if(gTask[threadIndex].status == THREAD_SUSPENDED && gTask[threadIndex].suspended == threadInfo.Ind
+             -ex)
+ 181   2              {
+ 182   3                  gTask[threadIndex].status = THREAD_WAITING;
+ 183   3                  gTask[threadIndex].suspended = false;
+ 184   3                  *status = THREAD_OK;
+ 185   3                  return;
+ 186   3              }
+ 187   2          }
+ 188   1      
+ 189   1          *status = THREAD_ERR;
+ 190   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1370    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     73      28
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

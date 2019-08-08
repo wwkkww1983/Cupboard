@@ -1,0 +1,384 @@
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE UART0
+OBJECT MODULE PLACED IN .\Output\uart0.obj
+COMPILER INVOKED BY: F:\Program Files (x86)\KEIL_C51\C51\BIN\C51.EXE Code\uart0.c LARGE BROWSE NOINTPROMOTE INCDIR(.\Cod
+                    -e;.\Code\MyPt;.\Code\MyPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\uart0.lst) OBJECT(.\Output\uart0.ob
+                    -j)
+
+line level    source
+
+   1          /*****************************************************************************
+   2            * @file       : uart0
+   3            * @brief      : null
+   4            * @note       : null
+   5            * @version    : V1.0
+   6            * @date       : 2017-5-25
+   7          ******************************************************************************/
+   8          
+   9          
+  10          /*
+  11          
+  12          A.      客户端连接后 首先要做一件事：将自已信息上报服务器
+  13          
+  14          发送明文    info@@$$@@入网号@@$$@@当前电量（int）@@$$@@当前门的状态
+  15                  如： info@@$$@@8899-88922-778@@$$@@98@@$$@@1
+  16                  表示向服务器报告：我的入网号是8899-88922-778  我当前电量是 98%  门的状态1
+             -表示关，0表示开
+  17          
+  18          只有上报了信息服务器才能审核你的身份并查看是否有你的锁要开。
+  19          
+  20          B. 服务器可以测试向你发送  open@@$$@@你的入网号  表示要求你开锁。
+  21          
+  22          C．你向服务器发送 openok@@$$@@你的入网号  表示你开锁成功。
+  23          
+  24          D．你向服务器发送 openerror@@$$@@你的入网号 表示开锁失败。
+  25          
+  26          E．你向服务器发送 lock@@$$@@你的入网号  表示报告服务器柜门已关
+  27          
+  28          F. 服务器收到你的任何消息会回复你“[你发上来的消息] ok” 这条消息你可以不�
+             -��任何处理。
+  29          
+  30          */
+  31          
+  32          
+  33          
+  34          
+  35          //.C
+  36          /*============包含标准库头文件================================================*/
+  37          /*============包含非标准库头文件==============================================*/
+  38          #include "m_include.h"
+  39          #include "uart0.h"
+  40          /*============文件内部 常量定义 const ========================================*/
+  41          
+  42          
+  43          /*============文件内部 宏定义 define ==========================================*/
+  44          
+  45          
+  46          
+  47          /*============文件内部 数据类型定义 typedef ==================================*/
+  48          
+  49          /*============文件内部 局部变量定义 static ===================================*/
+  50          UART_Struct UART_0;
+  51          
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 2   
+
+  52          /*============文件内部 全局变量定义 ==========================================*/
+  53          
+  54          /*============文件内部 函数原型定义 static ===================================*/
+  55          
+  56          /*******************************************************************************
+  57            * @name       : UART0_Buf_Find
+  58            * @brief      : 查找源数组中是否有目标数组，返回匹配的位置
+  59            * @note       : null
+  60            * @param      : @src-源比较数组 @src_len-源比较数组长度 @dest-目标比较数组 @dest_len-�
+             -��标比较数组长度
+  61            * @retval     : 匹配位置， @小于0 无匹配  @大于等于0 有匹配
+  62            * @author     : 2018-1-20
+  63          *******************************************************************************/
+  64          int UART0_Buf_Find( uint8_t* src, int src_len, uint8_t* dest, int dest_len )
+  65          {
+  66   1          int i, j, c;
+  67   1      
+  68   1          if( src_len < dest_len )
+  69   1          {
+  70   2              return -1;
+  71   2          }
+  72   1      
+  73   1          for( i = 0; i < src_len; i++ )
+  74   1          {
+  75   2              if( src[i] == dest[0] )
+  76   2              {
+  77   3                  c = 0;
+  78   3      
+  79   3                  for( j = 0; j < dest_len; j++ )
+  80   3                  {
+  81   4                      if( src[i + j] == dest[j] )
+  82   4                      {
+  83   5                          c++;
+  84   5      
+  85   5                          if( c == dest_len )
+  86   5                          {
+  87   6                              return i;
+  88   6                          }
+  89   5                      }
+  90   4                      else
+  91   4                      {
+  92   5                          break;
+  93   5                      }
+  94   4                  }
+  95   3              }
+  96   2          }
+  97   1      
+  98   1          return -2;
+  99   1      }
+ 100          
+ 101          //发送一个字节
+ 102          void UART0_Tx_Byte( uint8_t buf )
+ 103          {
+ 104   1      
+ 105   1          uint16_t t = 0;
+ 106   1      
+ 107   1          UART_0.TI_FLAG = 0;
+ 108   1          SBUF = buf;
+ 109   1      
+ 110   1          while( ( UART_0.TI_FLAG == 0 ) && ( t < 0XFFF0 ) )
+ 111   1          {
+ 112   2              t++;
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 3   
+
+ 113   2          }
+ 114   1      
+ 115   1          UART_0.TI_FLAG = 0;
+ 116   1      
+ 117   1      }
+ 118          
+ 119          //发送字符串
+ 120          void UART0_Tx_String( uint8_t* buf )
+ 121          {
+ 122   1          uint8_t i = 0;
+ 123   1          uint16_t t = 0;
+ 124   1      
+ 125   1      
+ 126   1          while( *( buf + i ) )
+ 127   1          {
+ 128   2              UART_0.TI_FLAG = 0;
+ 129   2              SBUF = *( buf + i );
+ 130   2      
+ 131   2              while( ( UART_0.TI_FLAG == 0 ) && ( t < 0XFFF0 ) )
+ 132   2              {
+ 133   3                  t++;
+ 134   3              }
+ 135   2      
+ 136   2              i++;
+ 137   2              UART_0.TI_FLAG = 0;
+ 138   2          }
+ 139   1      
+ 140   1      }
+ 141          
+ 142          //发送数组
+ 143          void UART0_Tx_Data( uint8_t* buf, uint8_t len )
+ 144          {
+ 145   1      
+ 146   1          uint8_t i = 0;
+ 147   1          uint16_t t = 0;
+ 148   1      
+ 149   1          for( i = 0; i < len; i++ )
+ 150   1          {
+ 151   2              UART_0.TI_FLAG = 0; //在串口中断中，当发送完成后置1
+ 152   2              SBUF = *( buf + i );
+ 153   2      
+ 154   2              //baute
+ 155   2              //OK:9600 19200
+ 156   2              //ERR:>19200
+ 157   2      
+ 158   2      
+ 159   2              /*
+ 160   2              9600--   t测试等待约 713         0XFFF0
+ 161   2              19200--  t测试等待约 355         0XFFF0
+ 162   2              38400--  t测试等待约 178
+ 163   2              115200-- t测试等待约 60
+ 164   2              */
+ 165   2              while( ( UART_0.TI_FLAG == 0 ) && ( t < 0XFFF0 ) ) //  ERR:0XFFF 4096
+ 166   2              {
+ 167   3                  t++;
+ 168   3              }
+ 169   2      
+ 170   2              UART_0.TI_FLAG = 0;
+ 171   2          }
+ 172   1      
+ 173   1      }
+ 174          
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 4   
+
+ 175          //发送ASCII码数字
+ 176          void UART0_Tx_Num( uint16_t num )
+ 177          {
+ 178   1          uint8_t buf[5];
+ 179   1      
+ 180   1          if( num < 10 )
+ 181   1          {
+ 182   2              buf[0] = ( num / 1 % 10 ) + 0x30;
+ 183   2              UART0_Tx_Data( buf, 1 );
+ 184   2          }
+ 185   1          else if( num < 100 )
+ 186   1          {
+ 187   2              buf[0] = ( num / 10 % 10 ) + 0x30;
+ 188   2              buf[1] = ( num / 1 % 10 ) + 0x30;
+ 189   2              UART0_Tx_Data( buf, 2 );
+ 190   2          }
+ 191   1          else if( num < 1000 )
+ 192   1          {
+ 193   2      
+ 194   2              buf[0] = ( num / 100 % 10 ) + 0x30;
+ 195   2              buf[1] = ( num / 10 % 10 ) + 0x30;
+ 196   2              buf[2] = ( num / 1 % 10 ) + 0x30;
+ 197   2      
+ 198   2              UART0_Tx_Data( buf, 3 );
+ 199   2      
+ 200   2          }
+ 201   1          else if( num < 10000 )
+ 202   1          {
+ 203   2              buf[0] = ( num / 1000 % 10 ) + 0x30;
+ 204   2              buf[1] = ( num / 100 % 10 ) + 0x30;
+ 205   2              buf[2] = ( num / 10 % 10 ) + 0x30;
+ 206   2              buf[3] = ( num / 1 % 10 ) + 0x30;
+ 207   2      
+ 208   2              UART0_Tx_Data( buf, 4 );
+ 209   2      
+ 210   2          }
+ 211   1          else if( num < 100000 )
+ 212   1          {
+ 213   2              buf[0] = ( num / 10000 % 10 ) + 0x30;
+ 214   2              buf[1] = ( num / 1000 % 10 ) + 0x30;
+ 215   2              buf[2] = ( num / 100 % 10 ) + 0x30;
+ 216   2              buf[3] = ( num / 10 % 10 ) + 0x30;
+ 217   2              buf[4] = ( num / 1 % 10 ) + 0x30;
+ 218   2      
+ 219   2              UART0_Tx_Data( buf, 5 );
+ 220   2      
+ 221   2          }
+ 222   1      
+ 223   1      
+ 224   1      
+ 225   1      }
+ 226          
+ 227          
+ 228          /*******************************************************************************
+ 229            * @name       : UART0_Rx 10ms
+ 230            * @brief      : deal UART receive data & time out check
+ 231            * @note       : null
+ 232            * @param      : null
+ 233            * @retval     : null
+ 234            * @author     : 2017-3-3
+ 235          *******************************************************************************/
+ 236          void UART0_Rx( void )
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 5   
+
+ 237          {
+ 238   1          uint8_t index = 0;
+ 239   1          uint8_t check_sum_buf = 0;
+ 240   1          uint8_t check_sum_index = 0;
+ 241   1          uint8_t find_head = 0;
+ 242   1          uint8_t cnt = 0;
+ 243   1              uint8_t i;
+ 244   1              
+ 245   1      
+ 246   1          //time out check
+ 247   1          if( UART_0.RxTimeOutCnt < 0xFF )
+ 248   1          {
+ 249   2              UART_0.RxTimeOutCnt++;
+ 250   2      
+ 251   2              if( UART_0.RxTimeOutCnt == RX_TIME_OUT ) //3*10ms
+ 252   2              {
+ 253   3      
+ 254   3                  //如果是OS,加临界区
+ 255   3                  //deal receive data
+ 256   3                  if( UART_0.F_RxSynch == 1 )
+ 257   3                  {
+ 258   4                      if(Control.IMEI_Get)
+ 259   4                      {
+ 260   5                                              
+ 261   5                                              if((UART_0.RxBuf[0]<='9')&(UART_0.RxBuf[1]<='9')&(UART_0.RxBuf[2]<='9')  )
+ 262   5                                              {
+ 263   6      
+ 264   6                                                      for(i=0;i<15;i++)
+ 265   6                                                      {
+ 266   7                                                              Control.IMEI_Buffer[i]=UART_0.RxBuf[i];
+ 267   7                                                      }
+ 268   6                                                      Control.IMEI_Get=0;
+ 269   6                                              }
+ 270   5      
+ 271   5                      }
+ 272   4                      else
+ 273   4                      {
+ 274   5                          if( UART0_Buf_Find( UART_0.RxBuf, UART_0.RxCnt, "CONNECT OK", 10 )  >= 0 )
+ 275   5                          {
+ 276   6                              Control.TCP_Conneted = 1;//Control.TCP_Conneted
+ 277   6                              Control.Protocol_A_Info=1;
+ 278   6                          }
+ 279   5      
+ 280   5                          if( UART0_Buf_Find( UART_0.RxBuf, UART_0.RxCnt, "open", 4 )  >= 0 )
+ 281   5                          {
+ 282   6                              if( UART0_Buf_Find( UART_0.RxBuf, UART_0.RxCnt, "ok", 2 )  < 0 )
+ 283   6                              {
+ 284   7                                  Control.TCP_Conneted = 1;
+ 285   7      
+ 286   7                                  Lock_Control( 1 );
+ 287   7      
+ 288   7                                  Control.WakeUp_Cnt = KEY_WAKEUP_CNT_MAX;//收到控制数据，休眠顺延
+ 289   7                              
+ 290   7                              }
+ 291   6                              
+ 292   6                          }
+ 293   5                          
+ 294   5                          if( UART0_Buf_Find( UART_0.RxBuf, UART_0.RxCnt, "lock", 4 )  >= 0 )
+ 295   5                          {
+ 296   6                               Control.WakeUp_Cnt = 10;//收到关锁应答 立即进入休眠
+ 297   6                          }
+ 298   5                          
+C51 COMPILER V9.52.0.0   UART0                                                             08/07/2019 16:00:35 PAGE 6   
+
+ 299   5                      }
+ 300   4      
+ 301   4      
+ 302   4                  }
+ 303   3      
+ 304   3      
+ 305   3                  //time out,clear,for next correct rx
+ 306   3                  memset( UART_0.RxBuf, 0, sizeof( UART_0.RxBuf ) );
+ 307   3                  UART_0.F_RxSynch = 0;
+ 308   3                  UART_0.RxCnt = 0;
+ 309   3                  //如果是OS,加临界区
+ 310   3      
+ 311   3              }
+ 312   2          }
+ 313   1      
+ 314   1      }
+ 315          
+ 316          /*******************************************************************************
+ 317            * @name       : UART0_Rx_Isr
+ 318            * @brief      : receive the data,check the synchronize head
+ 319            * @note       : call by UART rx interrupt service
+ 320            * @param      : null
+ 321            * @retval     : null
+ 322            * @author     : 2017-3-3
+ 323          *******************************************************************************/
+ 324          void UART0_Rx_Isr( void )
+ 325          {
+ 326   1      
+ 327   1          // RX
+ 328   1          if( RI )
+ 329   1          {
+ 330   2              RI = 0;
+ 331   2              UART_0.RxBuf[UART_0.RxCnt] = SBUF; //get rx data
+ 332   2      
+ 333   2              UART_0.RxCnt++;
+ 334   2              UART_0.RxTimeOutCnt = 0;
+ 335   2      
+ 336   2              UART_0.F_RxSynch = 1;
+ 337   2      
+ 338   2      
+ 339   2          }
+ 340   1      
+ 341   1      }
+ 342          
+ 343          
+ 344          
+ 345          
+ 346          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1390    ----
+   CONSTANT SIZE    =     24    ----
+   XDATA SIZE       =    133      37
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

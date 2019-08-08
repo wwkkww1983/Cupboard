@@ -1,0 +1,10 @@
+".\Output\main.obj",
+".\Output\detection_control.obj",
+".\Output\uart0.obj",
+".\Output\systick.obj",
+".\Output\thread.obj",
+".\Output\sem.obj",
+".\Output\STARTUP.obj" 
+TO ".\Output\Demo" 
+PRINT(".\LST\Demo.m51") RAMSIZE(256) 
+DISABLEWARNING (16) 

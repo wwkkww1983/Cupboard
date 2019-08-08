@@ -1,0 +1,48 @@
+C51 COMPILER V9.52.0.0   SEM                                                               08/07/2019 16:00:36 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE SEM
+OBJECT MODULE PLACED IN .\Output\sem.obj
+COMPILER INVOKED BY: F:\Program Files (x86)\KEIL_C51\C51\BIN\C51.EXE Code\MyPt\sem.c LARGE BROWSE NOINTPROMOTE INCDIR(.\
+                    -Code;.\Code\MyPt;.\Code\MyPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\sem.lst) OBJECT(.\Output\sem.obj
+                    -)
+
+line level    source
+
+   1          #include "sem.h"
+   2          #include "m_include.h"
+   3          
+   4          u8   SEM[MAX_SEM];
+   5          BOOL MUTEX[MAX_MUTEX];
+   6          /********************************************//**
+   7           * \brief    获取信号量
+   8           *
+   9           * \param
+  10           * \param
+  11           * \return
+  12           *
+  13           ***********************************************/
+  14          BOOL getSem(u8* k)
+  15          {
+  16   1          if(*k)
+  17   1          {
+  18   2              *k = 0;
+  19   2              return true;
+  20   2          }
+  21   1      
+  22   1          return false;
+  23   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     15    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

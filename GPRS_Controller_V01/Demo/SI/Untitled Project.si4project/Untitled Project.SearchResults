@@ -1,0 +1,10 @@
+---- Lock_State Matches (9 in 2 files) ----
+detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) line 244 : void Lock_State_Check( void )
+Lock_State_Check in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :                 Control.Lock_State = 1;//1关锁 0-开锁
+Lock_State_Check in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :                 Control.Lock_State = 0;//1关锁 0-开锁
+RunDataUpDate in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :         UART0_Tx_Num(Control.Lock_State);
+Time_100ms_Thread in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :         Lock_State_Check();//锁状态检测 开锁=使用 关锁=空闲
+Time_100ms_Thread in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :         if( ( Control.Lock_OnOff == 0 ) && ( Control.Lock_State == 0 ) )
+Log_Thread in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :         UART0_Tx_String( "\r\n Control.Lock_State " );
+Log_Thread in detection_control.c (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :         UART0_Tx_Num( Control.Lock_State );
+{anonControl_Struct} in detection_control.h (D:\04MyFile\2G柜锁\代码\GPRS_Controller_V01_2019-8-3\Demo\Code) :     uint8_t Lock_State;           //锁状态 1关锁 0-开锁

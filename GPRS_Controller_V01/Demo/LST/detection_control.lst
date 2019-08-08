@@ -1,0 +1,797 @@
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE DETECTION_CONTROL
+OBJECT MODULE PLACED IN .\Output\detection_control.obj
+COMPILER INVOKED BY: F:\Program Files (x86)\KEIL_C51\C51\BIN\C51.EXE Code\detection_control.c LARGE BROWSE NOINTPROMOTE 
+                    -INCDIR(.\Code;.\Code\MyPt;.\Code\MyPt\pt-1.4) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\detection_control.lst) 
+                    -OBJECT(.\Output\detection_control.obj)
+
+line level    source
+
+   1          /*****************************************************************************
+   2            * @file       : detection_control
+   3            * @brief      : null
+   4            * @note       : null
+   5            * @version    : V1.0
+   6            * @date       : 2018-1-17
+   7          ******************************************************************************/
+   8          
+   9          //.C
+  10          /*============包含标准库头文件================================================*/
+  11          
+  12          /*============包含非标准库头文件==============================================*/
+  13          #include "m_include.h"
+  14          #include "detection_control.h"
+  15          #include "stdio.h"
+  16          /*============文件内部 常量定义 const ========================================*/
+  17          const uint8_t battery_percent_table[] =
+  18          {
+  19              100 ,
+  20              90  ,
+  21              80  ,
+  22              70  ,
+  23              60  ,
+  24              50  ,
+  25              40  ,
+  26              30  ,
+  27              20  ,
+  28              15  ,
+  29              10  ,
+  30              5   ,
+  31              0   ,
+  32          };
+  33          
+  34          
+  35          const uint16_t battery_volt_table[] =
+  36          {
+  37              4100,
+  38              4080,
+  39              4000,
+  40              3930,
+  41              3870,
+  42              3820,
+  43              3790,
+  44              3770,
+  45              3730,
+  46              3700,
+  47              3680,
+  48              3500,
+  49              3400,
+  50          };
+  51          
+  52          /*============文件内部 宏定义 define =========================================*/
+  53          
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 2   
+
+  54          
+  55          
+  56          /*============文件内部 数据类型定义 typedef ==================================*/
+  57          
+  58          
+  59          /*============文件内部 局部变量定义 static ===================================*/
+  60          
+  61          /*============文件内部 全局变量定 ============================================*/
+  62          idata Control_Struct Control;
+  63          
+  64          bit BIT_TMP;
+  65          
+  66          /*============文件内部 函数原型定义 static ===================================*/
+  67          
+  68          static void gpio_init( void )
+  69          {
+  70   1      
+  71   1          Set_All_GPIO_Quasi_Mode;
+  72   1      
+  73   1          //输出
+  74   1          P15_PushPull_Mode;//锁开关
+  75   1          P03_PushPull_Mode;//蜂鸣器
+  76   1      
+  77   1          P01_PushPull_Mode;//通信模块供电控制
+  78   1          P11_PushPull_Mode;//通信模块复位引脚
+  79   1          P12_PushPull_Mode;//通信模块电源引脚
+  80   1      
+  81   1          P10_PushPull_Mode;//LED_BLUE
+  82   1      
+  83   1          //输入
+  84   1          P17_Input_Mode;//锁的状态
+  85   1          P30_Input_Mode;//触摸按键
+  86   1          P05_Input_Mode;//USB 插入检测
+  87   1      
+  88   1      }
+  89          
+  90          void exti_init( void )
+  91          {
+  92   1          //EXTI
+  93   1          set_P1S_7;
+  94   1          Enable_INT_Port1;
+  95   1          Enable_BIT1_FallEdge_Trig;
+  96   1      
+  97   1          set_P3S_0;
+  98   1          Enable_INT_Port3;
+  99   1          Enable_BIT5_FallEdge_Trig;
+ 100   1      
+ 101   1      }
+ 102          
+ 103          void uart0_timer3_init( uint32_t u32Baudrate )
+ 104          {
+ 105   1      
+ 106   1          P0M1 &= ~SET_BIT6;
+ 107   1          P0M2 &= ~SET_BIT6;
+ 108   1          P0M1 &= ~SET_BIT7;
+ 109   1          P0M2 &= ~SET_BIT7;
+ 110   1      
+ 111   1          SCON = 0x50;//UART0 Mode1,REN=1,TI=1
+ 112   1          PCON |= SET_BIT7; //UART0 Double Rate Enable
+ 113   1          T3CON &= 0xF8; //T3PS2=0,T3PS1=0,T3PS0=0(Prescale=1)
+ 114   1          T3CON |= SET_BIT5; //UART0 baud rate clock source = Timer3
+ 115   1      
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 3   
+
+ 116   1          RH3 = ( 65536 - ( 1000000 / u32Baudrate ) - 1 ) >> 8; /*16 MHz */
+ 117   1          RL3 = ( 65536 - ( 1000000 / u32Baudrate ) - 1 ); /*16 MHz */
+ 118   1      
+ 119   1          T3CON |= SET_BIT3; //Trigger Timer3
+ 120   1      
+ 121   1          P06 = 1;
+ 122   1          P07 = 1;
+ 123   1      
+ 124   1          ES = 1;
+ 125   1      
+ 126   1          //RI = 1;
+ 127   1          TI = 1;
+ 128   1      
+ 129   1      
+ 130   1      }
+ 131          
+ 132          
+ 133          void adc_init( void )
+ 134          {
+ 135   1          Enable_ADC_AIN5;//P04
+ 136   1      }
+ 137          
+ 138          
+ 139          
+ 140          
+ 141          
+ 142          uint16_t adc_get_channel_value( uint8_t ch )
+ 143          {
+ 144   1          uint8_t t = 0;
+ 145   1          uint16_t buf = 0;
+ 146   1      
+ 147   1          ADCS = 0;
+ 148   1          ADCF = 0;
+ 149   1          ADCCON0 |= ch;
+ 150   1          ADCS = 1;
+ 151   1      
+ 152   1          while( ( ADCF == 0 ) && ( t < 250 ) )
+ 153   1          {
+ 154   2              t++;
+ 155   2          }
+ 156   1          ADCF = 0;
+ 157   1          buf = ( uint16_t ) ( ADCRH * 16 );
+ 158   1          buf = buf | ( ADCRL & 0x0f );
+ 159   1      
+ 160   1          return buf;
+ 161   1      
+ 162   1      }
+ 163          
+ 164          uint8_t check_sum_add_8( uint8_t* buf, uint8_t len )
+ 165          {
+ 166   1          uint8_t i = 0;
+ 167   1          uint8_t Sum = 0;
+ 168   1      
+ 169   1          for( i = 0; i < len; i++ )
+ 170   1          {
+ 171   2              Sum += *buf++;
+ 172   2          }
+ 173   1      
+ 174   1          return Sum;
+ 175   1      }
+ 176          
+ 177          
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 4   
+
+ 178          //进入低功耗模式
+ 179          void EnterStopMode( void )
+ 180          {
+ 181   1      
+ 182   1      
+ 183   1      //小循环
+ 184   1      ORG_Idel_IN:
+ 185   1      
+ 186   1          set_EX0;//使能中断
+ 187   1          set_EX1;
+ 188   1      
+ 189   1          set_PD;//进入掉电模式
+ 190   1      
+ 191   1          if( ( Control.Key_WakeUp != 1 ) ) //非按键唤醒且未到定时同步，则继续小循环
+ 192   1          {
+ 193   2              //小循环处理
+ 194   2      
+ 195   2      
+ 196   2              goto ORG_Idel_IN;//小循环
+ 197   2          }
+ 198   1      
+ 199   1      
+ 200   1          if( Control.Key_WakeUp == 1 )
+ 201   1          {
+ 202   2              //按键唤醒
+ 203   2              Control.Key_WakeUp = 0;
+ 204   2              Control.WakeUp_Cnt = KEY_WAKEUP_CNT_MAX;
+ 205   2          }
+ 206   1          else
+ 207   1          {
+ 208   2              //定时唤醒
+ 209   2              Control.WakeUp_Cnt = TIME_WAKEUP_CNT_MAX;
+ 210   2          }
+ 211   1      
+ 212   1      }
+ 213          
+ 214          void Lock_Control( uint8_t Lock_OnOff )
+ 215          {
+ 216   1          Control.Lock_OnOff = Lock_OnOff;
+ 217   1          Control.Lock_Set = 1;
+ 218   1      }
+ 219          
+ 220          //100ms
+ 221          void Lock_State_Check( void )
+ 222          {
+ 223   1          static uint8_t cnt;
+ 224   1          static uint8_t cnt2;
+ 225   1      
+ 226   1          if( Control.Lock_Set == 0 )
+ 227   1          {
+ 228   2      
+ 229   2              if( PIN_LOCK_POWER_READ == 0 ) //关锁
+ 230   2              {
+ 231   3      
+ 232   3                  if( cnt < 0xff )
+ 233   3                  {
+ 234   4                      cnt++;
+ 235   4                  }
+ 236   3      
+ 237   3                  if( cnt == 10 )
+ 238   3                  {
+ 239   4                      cnt2 = 0;
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 5   
+
+ 240   4                      Control.Lock_State = 1;//1关锁 0-开锁
+ 241   4                      Control.Protocol_E_Lock=1;
+ 242   4                  }
+ 243   3      
+ 244   3              }
+ 245   2              else //未锁上
+ 246   2              {
+ 247   3      
+ 248   3                  if( cnt2 < 0xff )
+ 249   3                  {
+ 250   4                      cnt2++;
+ 251   4                  }
+ 252   3      
+ 253   3                  if( cnt2 == 10 )
+ 254   3                  {
+ 255   4                      cnt = 0;
+ 256   4                      Control.Lock_State = 0;//1关锁 0-开锁
+ 257   4                  }
+ 258   3      
+ 259   3              }
+ 260   2      
+ 261   2          }
+ 262   1      }
+ 263          
+ 264          void Buzzer_Control( void )
+ 265          {
+ 266   1      
+ 267   1          if( Control.Buzzer_OnOff == 1 )
+ 268   1          {
+ 269   2              PIN_BUZZER_EN_ON
+ 270   2          }
+ 271   1          else
+ 272   1          {
+ 273   2              PIN_BUZZER_EN_OFF
+ 274   2          }
+ 275   1      
+ 276   1      }
+ 277          
+ 278          void read_mcu_96bit_uuid( uint8_t *id_buf )
+ 279          {
+ 280   1      
+ 281   1          uint8_t i;
+ 282   1          uint8_t EA_BUF;
+ 283   1      
+ 284   1          EA_BUF = EA;
+ 285   1          EA = 0;
+ 286   1      
+ 287   1          //IAPEN
+ 288   1          TA = 0xAA;
+ 289   1          TA = 0x55;
+ 290   1          CHPCON |= SET_BIT0;
+ 291   1      
+ 292   1          //96bit =12byte
+ 293   1          for( i = 0; i < 12; i++ )
+ 294   1          {
+ 295   2      
+ 296   2              IAPAL = i;//
+ 297   2              IAPAH = 0x00;
+ 298   2      
+ 299   2              IAPCN = 0x04;//
+ 300   2      
+ 301   2              TA = 0xAA;
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 6   
+
+ 302   2              TA = 0x55;
+ 303   2              IAPTRG |= SET_BIT0;
+ 304   2      
+ 305   2              id_buf[i] = IAPFD;
+ 306   2      
+ 307   2          }
+ 308   1      
+ 309   1          //IAPEN
+ 310   1          TA = 0xAA;
+ 311   1          TA = 0x55;
+ 312   1          CHPCON &= ~SET_BIT0;
+ 313   1      
+ 314   1          EA = EA_BUF;
+ 315   1      
+ 316   1      }
+ 317          
+ 318          
+ 319          //100ms
+ 320          void Battery_Volt_Detec( void )
+ 321          {
+ 322   1          uint8_t i;
+ 323   1      
+ 324   1          static uint8_t cnt;
+ 325   1          static uint8_t cnt1;
+ 326   1      
+ 327   1          Control.BatteryVolt = adc_get_channel_value( 5 ) * 1.08;
+ 328   1      
+ 329   1          for( i = 0; i < 13; i++ )
+ 330   1          {
+ 331   2      
+ 332   2              if( Control.BatteryVolt >= battery_volt_table[i] )
+ 333   2              {
+ 334   3                  break;
+ 335   3              }
+ 336   2      
+ 337   2          }
+ 338   1      
+ 339   1          Control.BatteryCapacity = battery_percent_table[i];
+ 340   1      
+ 341   1          if(Control.BatteryCapacity<=5)
+ 342   1          {
+ 343   2              cnt++;
+ 344   2              cnt1=0;
+ 345   2      
+ 346   2              if(cnt>=20)
+ 347   2              {
+ 348   3                  cnt=0;
+ 349   3                  Control.Error_BatteryLow=2;
+ 350   3              }
+ 351   2      
+ 352   2          }
+ 353   1          else if(Control.BatteryCapacity<=15)
+ 354   1          {
+ 355   2      
+ 356   2              cnt=0;
+ 357   2              cnt1++;
+ 358   2      
+ 359   2              if(cnt1>=20)
+ 360   2              {
+ 361   3                  cnt1=0;
+ 362   3                  Control.Error_BatteryLow=1;
+ 363   3              }
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 7   
+
+ 364   2      
+ 365   2          }
+ 366   1          else
+ 367   1          {
+ 368   2              cnt=0;
+ 369   2              cnt1=0;
+ 370   2              Control.Error_BatteryLow=0;
+ 371   2          }
+ 372   1      
+ 373   1      }
+ 374          
+ 375          
+ 376          
+ 377          /*
+ 378          
+ 379          char Demo_Thread(thread_t* pt)
+ 380          {
+ 381              Thread_BEGIN
+ 382          
+ 383              while(true)
+ 384              {
+ 385          
+ 386          
+ 387                  Thread_Sleep(10);
+ 388          
+ 389              }
+ 390          
+ 391              Thread_END
+ 392          
+ 393          }
+ 394          
+ 395          
+ 396          */
+ 397          
+ 398          
+ 399          char Time_10ms_Thread( thread_t* pt )
+ 400          {
+ 401   1          Thread_BEGIN
+ 402   3      
+ 403   3          while( true )
+ 404   3          {
+ 405   4      
+ 406   4              //Key_Scan();
+ 407   4              UART0_Rx();
+ 408   4              Thread_Sleep( 10 );
+ 409   4      
+ 410   4          }
+ 411   3      
+ 412   3          Thread_END
+ 413   1      
+ 414   1      }
+ 415          
+ 416          
+ 417          char Time_100ms_Thread( thread_t* pt )
+ 418          {
+ 419   1          Thread_BEGIN
+ 420   3      
+ 421   3          //硬件上电操作
+ 422   3          Control.WakeUp_Cnt = KEY_WAKEUP_CNT_MAX;
+ 423   3      
+ 424   3          memset(Control.IMEI_Buffer,0,16);
+ 425   3          memcpy(Control.IMEI_Buffer,"359759002514931",15);
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 8   
+
+ 426   3      
+ 427   3      
+ 428   3          while( true )
+ 429   3          {
+ 430   4              PIN_LED_BLUE_ON
+ 431   4              //key_value_for_mode();
+ 432   4              Buzzer_Control();//蜂鸣器控制
+ 433   4              Battery_Volt_Detec();//电量检测
+ 434   4              Lock_State_Check();//锁状态检测
+ 435   4      
+ 436   4              if( Control.WakeUp_Cnt )
+ 437   4              {
+ 438   5                  Control.WakeUp_Cnt--;//低功耗控制
+ 439   5              }
+ 440   4      
+ 441   4              if( Control.WakeUp_Cnt == 0 ) //进入待机
+ 442   4              {
+ 443   5                  UART0_Tx_String("log:EnterStopMode\r\n");
+ 444   5      
+ 445   5                  //进入前的操作 关闭通信模块 蜂鸣器
+ 446   5                  Control.TCP_Conneted = 0;
+ 447   5                  
+ 448   5                  PIN_GPRS_EN_OFF
+ 449   5                  PIN_BUZZER_EN_OFF
+ 450   5                  PIN_LED_BLUE_OFF
+ 451   5                  
+ 452   5                  Thread_Sleep( 100 );
+ 453   5                  EnterStopMode();
+ 454   5      
+ 455   5                  //退出后的操作 开启通信模块
+ 456   5                  Thread_Sleep( 100 );
+ 457   5                  
+ 458   5                  PIN_GPRS_EN_ON
+ 459   5                  Thread_Sleep( 100 );
+ 460   5                  PIN_GPRS_POWER_L
+ 461   5                  Thread_Sleep( 2200 );//on
+ 462   5                  PIN_GPRS_POWER_H
+ 463   5      
+ 464   5                  UART0_Tx_String("log:QuitStopMode\r\n");
+ 465   5      
+ 466   5      
+ 467   5              }
+ 468   4      
+ 469   4              Thread_Sleep( 100 );
+ 470   4      
+ 471   4          }
+ 472   3      
+ 473   3          Thread_END
+ 474   1      
+ 475   1      }
+ 476          
+ 477          char Gprs_Send_Data_Thread( thread_t* pt )
+ 478          {
+ 479   1          Thread_BEGIN
+ 480   3          
+ 481   3          PIN_GPRS_RESET_H
+ 482   3          
+ 483   3          PIN_GPRS_EN_ON
+ 484   3          Thread_Sleep( 100 );
+ 485   3          PIN_GPRS_POWER_L
+ 486   3          Thread_Sleep( 2200 );//on
+ 487   3          PIN_GPRS_POWER_H
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 9   
+
+ 488   3      
+ 489   3          while( true )
+ 490   3          {
+ 491   4      
+ 492   4              //等待信号量
+ 493   4              Thread_Wait_Until( Control.TCP_Conneted==1);
+ 494   4      
+ 495   4              if(Control.Protocol_A_Info)
+ 496   4              {
+ 497   5                  Control.Protocol_A_Info=0;
+ 498   5      
+ 499   5                  /*
+ 500   5                  A.信息上报
+ 501   5                  发送明文    info@@$$@@入网号@@$$@@当前电量（int）@@$$@@当前门的状态
+ 502   5                  如： info@@$$@@8899-88922-778@@$$@@98@@$$@@1
+ 503   5                  表示向服务器报告：我的入网号是8899-88922-778
+ 504   5                  我当前电量是 98%  门的状态1表示关，0表示开
+ 505   5                  */
+ 506   5      
+ 507   5                  UART0_Tx_String("info@@$$@@");
+ 508   5                  UART0_Tx_String(Control.IMEI_Buffer);
+ 509   5      
+ 510   5                  UART0_Tx_String("@@$$@@");
+ 511   5                  UART0_Tx_Num(Control.BatteryCapacity);
+ 512   5      
+ 513   5                  UART0_Tx_String("@@$$@@");
+ 514   5                  UART0_Tx_Num(Control.Lock_State);
+ 515   5      
+ 516   5                  UART0_Tx_String("\r\n");
+ 517   5      
+ 518   5              }
+ 519   4              else if(Control.Protocol_B_Open)
+ 520   4              {
+ 521   5                  Control.Protocol_B_Open=0;
+ 522   5      
+ 523   5              }
+ 524   4              else if(Control.Protocol_C_OpenOk)
+ 525   4              {
+ 526   5                  Control.Protocol_C_OpenOk=0;
+ 527   5                  /*
+ 528   5                  C．你向服务器发送 openok@@$$@@你的入网号  表示你开锁成功。
+ 529   5                  D．你向服务器发送 openerror@@$$@@你的入网号 表示开锁失败
+ 530   5                  */
+ 531   5                  UART0_Tx_String("openok@@$$@@");
+ 532   5                  UART0_Tx_String(Control.IMEI_Buffer);
+ 533   5      
+ 534   5              }
+ 535   4              else if(Control.Protocol_D_OpenError)
+ 536   4              {
+ 537   5                  Control.Protocol_D_OpenError=0;
+ 538   5                  /*
+ 539   5                  C．你向服务器发送 openok@@$$@@你的入网号  表示你开锁成功。
+ 540   5                  D．你向服务器发送 openerror@@$$@@你的入网号 表示开锁失败
+ 541   5                  */
+ 542   5                  UART0_Tx_String("openerror@@$$@@");
+ 543   5                  UART0_Tx_String(Control.IMEI_Buffer);
+ 544   5      
+ 545   5                  UART0_Tx_String("\r\n");
+ 546   5      
+ 547   5              }
+ 548   4              else if(Control.Protocol_E_Lock)
+ 549   4              {
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 10  
+
+ 550   5                  Control.Protocol_E_Lock=0;
+ 551   5                  /*
+ 552   5                  E．你向服务器发送 lock@@$$@@你的入网号  表示报告服务器柜门已关
+ 553   5                  */
+ 554   5                  UART0_Tx_String("lock@@$$@@");
+ 555   5                  UART0_Tx_String(Control.IMEI_Buffer);
+ 556   5      
+ 557   5                  UART0_Tx_String("\r\n");
+ 558   5      
+ 559   5              }
+ 560   4      
+ 561   4              Thread_Sleep( 500 );
+ 562   4      
+ 563   4          }
+ 564   3      
+ 565   3          Thread_END
+ 566   1      
+ 567   1      }
+ 568          
+ 569          char Time_Limit_Thread( thread_t* pt )
+ 570          {
+ 571   1          Thread_BEGIN
+ 572   3      
+ 573   3          while( true )
+ 574   3          {
+ 575   4      
+ 576   4      #if (TIME_LIMIT==1)
+              
+              
+                      if( Control.Time_Limit_Half_Hour < 0xfff0 )
+                      {
+                          Control.Time_Limit_Half_Hour++;
+                      }
+              
+                      if( Control.Time_Limit_Half_Hour > TIME_LIMIT_HALF_HOUR_MAX )
+                      {
+              
+                          while( 1 )
+                          {
+                              //关闭所有负载
+                              //喂狗
+              
+                              //WdogRst();
+                              Thread_Sleep( 1000 );
+                          }
+              
+                      }
+              
+              #endif // TIME_LIMIT
+ 599   4      
+ 600   4      
+ 601   4              Thread_Sleep( MINUTES( 30 ) );
+ 602   4      
+ 603   4          }
+ 604   3      
+ 605   3          Thread_END
+ 606   1      
+ 607   1      }
+ 608          
+ 609          char Lock_Control_Thread( thread_t* pt )
+ 610          {
+ 611   1          Thread_BEGIN
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 11  
+
+ 612   3      
+ 613   3          while( true )
+ 614   3          {
+ 615   4              //等待信号量
+ 616   4              Thread_Wait_Until( Control.Lock_Set );
+ 617   4      
+ 618   4              Thread_Sleep( 10 );
+ 619   4      
+ 620   4              if( Control.Lock_OnOff == 1 )
+ 621   4              {
+ 622   5      
+ 623   5                  PIN_LOCK_EN_ON
+ 624   5                  Thread_Sleep( 700 ); //转动时间
+ 625   5                  PIN_LOCK_EN_OFF
+ 626   5      
+ 627   5                  Thread_Sleep( 10 );
+ 628   5                  if( PIN_LOCK_POWER_READ == 1 ) //成功 开锁
+ 629   5                  {
+ 630   6                      Control.Error_Open = 0;
+ 631   6                  }
+ 632   5                  else
+ 633   5                  {
+ 634   6                      Control.Error_Open = 1;
+ 635   6                  }
+ 636   5      
+ 637   5              }
+ 638   4              Control.Lock_Set = 0;
+ 639   4      
+ 640   4              if(Control.Error_Open==1)
+ 641   4              {
+ 642   5                  Control.Protocol_C_OpenOk=0;
+ 643   5                  Control.Protocol_D_OpenError=1;
+ 644   5              }
+ 645   4              else
+ 646   4              {
+ 647   5                  Control.Protocol_C_OpenOk=1;
+ 648   5                  Control.Protocol_D_OpenError=0;
+ 649   5              }
+ 650   4      
+ 651   4          }
+ 652   3      
+ 653   3          Thread_END
+ 654   1      
+ 655   1      }
+ 656          
+ 657          
+ 658          char Log_Thread( thread_t* pt )
+ 659          {
+ 660   1          Thread_BEGIN
+ 661   3      
+ 662   3          Thread_Sleep( 500 );
+ 663   3          UART0_Tx_String( "\r\n log \r\n" );
+ 664   3          while( true )
+ 665   3          {
+ 666   4      #if 0
+                      UART0_Tx_String( "\r\nlog: Control.BatteryVolt " );
+                      UART0_Tx_Num( Control.BatteryVolt );
+              
+                      UART0_Tx_String( "\r\nlog: Control.BatteryCapacity " );
+                      UART0_Tx_Num( Control.BatteryCapacity );
+              
+                      UART0_Tx_String( "\r\nlog: Control.Lock_State " );
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 12  
+
+                      UART0_Tx_Num( Control.Lock_State );
+              
+                      UART0_Tx_String( "\r\nlog: Control.Error_Open " );
+                      UART0_Tx_Num( Control.Error_Open );
+              
+                      UART0_Tx_String( "\r\nlog: Control.Error_Close " );
+                      UART0_Tx_Num( Control.Error_Close );
+              
+                      UART0_Tx_String( "\r\nlog: Control.Error_BatteryLow " );
+                      UART0_Tx_Num( Control.Error_BatteryLow );
+              
+              #endif
+ 686   4      
+ 687   4              Thread_Sleep( 1000 );
+ 688   4      
+ 689   4          }
+ 690   3      
+ 691   3          Thread_END
+ 692   1      
+ 693   1      }
+ 694          
+ 695          
+ 696          
+ 697          char IMEI_Get_Thread( thread_t* pt )
+ 698          {
+ 699   1          Thread_BEGIN
+ 700   3      
+ 701   3          Thread_Sleep( 1000 );
+ 702   3          Control.IMEI_Get=1;
+ 703   3          while( true )
+ 704   3          {
+ 705   4              Thread_Wait_Until( Control.IMEI_Get );
+ 706   4      
+ 707   4              UART0_Tx_String("READIMEI");
+ 708   4              UART0_Tx_String("\r\n");
+ 709   4      
+ 710   4              Thread_Sleep( 1000 );
+ 711   4      
+ 712   4          }
+ 713   3      
+ 714   3          Thread_END
+ 715   1      
+ 716   1      }
+ 717          
+ 718          
+ 719          
+ 720          
+ 721          //硬件初始化
+ 722          void HAL_Init(void)
+ 723          {
+ 724   1          gpio_init();
+ 725   1          exti_init();
+ 726   1          adc_init();
+ 727   1          uart0_timer3_init( 9600 );//19200
+ 728   1      }
+ 729          
+ 730          //任务初始化
+ 731          ThreadStatus TaskInit(void)
+ 732          {
+ 733   1      
+ 734   1          Thread_Start( Time_10ms_Thread, &threadInfo.status );
+ 735   1      
+C51 COMPILER V9.52.0.0   DETECTION_CONTROL                                                 08/07/2019 16:10:57 PAGE 13  
+
+ 736   1          Thread_Start( Time_100ms_Thread, &threadInfo.status );
+ 737   1          //Thread_Start(Gprs_Thread, &threadInfo.status);
+ 738   1          Thread_Start( Gprs_Send_Data_Thread, &threadInfo.status );
+ 739   1          // Thread_Start(Time_Limit_Thread, &threadInfo.status);
+ 740   1          Thread_Start( Lock_Control_Thread, &threadInfo.status );
+ 741   1          Thread_Start( IMEI_Get_Thread, &threadInfo.status );
+ 742   1      
+ 743   1          Thread_Start( Log_Thread, &threadInfo.status );
+ 744   1      
+ 745   1          return threadInfo.status;
+ 746   1      }
+ 747          
+ 748          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2675    ----
+   CONSTANT SIZE    =    135    ----
+   XDATA SIZE       =     99      38
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =     52    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
