@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "m_include.h": "c",
+        "function_define.h": "c",
+        "main.h": "c"
+    }
+}
